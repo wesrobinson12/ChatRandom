@@ -54,6 +54,22 @@ function findWaitingRoom(socket, pastRooms) {
   return null;
 }
 
+function joinRoom(socket, user, pastRooms) {
+  let emptyRoom = findWaitingRoom(socket, pastRooms);
+  if (emptyRoom === null) {
+    let newRoomId = uuidv4();
+    console.log('creating new room ' + newRoomId);
+    rooms[newRoomId] = [user];
+    socket.join(newRoomId);
+    io.emit('ROOM_JOINED', { name: newRoomId, new: true, users: rooms[newRoomId] });
+  } else {
+    console.log('joining other user in room ' + emptyRoom);
+    rooms[emptyRoom].push(user);
+    socket.join(emptyRoom);
+    io.emit('ROOM_JOINED', { name: emptyRoom, new: false, users: rooms[emptyRoom] });
+  }
+}
+
 let rooms = {};
 
 io.on('connection', (socket) => {
@@ -63,20 +79,7 @@ io.on('connection', (socket) => {
   // on connection, check for rooms with other users,
   // otherwise create your own
   socket.on('USER_CONNECTED', function(user) {
-    let emptyRoom = findWaitingRoom(socket, []);
-    if (emptyRoom === null) {
-      let newRoomId = uuidv4();
-      console.log('creating new room ' + newRoomId);
-      rooms[newRoomId] = [user.user];
-      socket.join(newRoomId);
-      io.emit('ROOM_JOINED', { name: newRoomId, new: true, users: rooms[newRoomId] });
-    } else {
-      console.log('joining other user in room ' + emptyRoom);
-      rooms[emptyRoom].push(user.user);
-      socket.join(emptyRoom);
-      io.emit('ROOM_JOINED', { name: emptyRoom, new: false, users: rooms[emptyRoom] });
-    }
-    console.log(rooms);
+    joinRoom(socket, user.user, [])
   });
 
   socket.on('SEND_MESSAGE', function(data) {
@@ -88,19 +91,7 @@ io.on('connection', (socket) => {
     socket.leave(roomData.currentRoom);
 
     io.emit('USER_LEFT', { room: roomData.currentRoom });
-    let newRoom = findWaitingRoom(socket, roomData.pastRooms);
-    if (newRoom === null) {
-      let newRoomId = uuidv4();
-      console.log('creating new room ' + newRoomId);
-      rooms[newRoomId] = [roomData.user];
-      socket.join(newRoomId);
-      io.emit('ROOM_JOINED', { name: newRoomId, new: true, users: rooms[newRoomId] });
-    } else {
-      console.log('joining other user in room ' + newRoom);
-      rooms[newRoom].push(roomData.user);
-      socket.join(newRoom);
-      io.emit('ROOM_JOINED', { name: newRoom, new: false, users: rooms[newRoom] });
-    }
+    joinRoom(socket, roomData.user, roomData.pastRooms)
   });
 
 
